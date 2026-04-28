@@ -3,28 +3,69 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Gun Shooter HD</title>
+    <title>Gun Shooter HD - Haider Games</title>
     <style>
         * { margin: 0; padding: 0; }
-        body { background: #000; overflow: hidden; touch-action: none; }
-        #gameCanvas { display: block; background: linear-gradient(to bottom, #0f2027, #203a43, #2c5364); }
+        body { 
+            background: #000; 
+            overflow: hidden; 
+            font-family: Arial; 
+            touch-action: none;
+        }
+        #gameCanvas { 
+            display: block; 
+            background: linear-gradient(180deg, #001122 0%, #003366 100%);
+        }
         #ui {
-            position: fixed; top: 10px; left: 10px; color: #fff;
-            font: bold 18px Arial; text-shadow: 2px 2px 4px #000; z-index: 10;
+            position: fixed; 
+            top: 10px; 
+            left: 10px;
+            color: #fff; 
+            font: bold 20px Arial; 
+            text-shadow: 2px 2px 4px #000;
+            z-index: 10;
         }
         #controls {
-            position: fixed; bottom: 20px; width: 100%; text-align: center; z-index: 10;
+            position: fixed; 
+            bottom: 20px; 
+            width: 100%; 
+            text-align: center;
+            z-index: 10;
         }
         #shootBtn {
-            padding: 20px 40px; font-size: 20px; background: #e74c3c;
-            color: white; border: none; border-radius: 50px; box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            padding: 20px 40px; 
+            font-size: 22px;
+            background: #e74c3c; 
+            color: white; 
+            border: none; 
+            border-radius: 50px;
+            box-shadow: 0 5px 15px rgba(231,76,60,0.4);
+        }
+        #gameOver {
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.9);
+            color: white; padding: 30px;
+            border-radius: 15px; text-align: center;
+            display: none; z-index: 20;
+        }
+        #restartBtn {
+            padding: 15px 30px; font-size: 18px;
+            background: #27ae60; color: white;
+            border: none; border-radius: 8px; margin-top: 15px;
         }
     </style>
 </head>
 <body>
     <canvas id="gameCanvas"></canvas>
     <div id="ui">Score: <span id="score">0</span> | Ammo: <span id="ammo">30</span> | Wave: <span id="wave">1</span></div>
-    <div id="controls"><button id="shootBtn">FIRE</button></div>
+    <div id="controls"><button id="shootBtn">TAP TO SHOOT</button></div>
+    <div id="gameOver">
+        <h2>Game Over!</h2>
+        <p>Final Score: <span id="finalScore">0</span></p>
+        <button id="restartBtn">Play Again</button>
+    </div>
 
 <script>
 const canvas = document.getElementById('gameCanvas');
@@ -32,10 +73,28 @@ const ctx = canvas.getContext('2d');
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-let score = 0, ammo = 30, wave = 1, gameActive = true;
-let player = { x: canvas.width/2, y: canvas.height-100, w: 40, h: 40 };
+let score = 0, ammo = 30, wave = 1, gameRunning = true;
+let player = { x: canvas.width/2, y: canvas.height-100, size: 25 };
 let bullets = [], enemies = [];
-let lastEnemySpawn = 0;
+
+document.getElementById('shootBtn').onclick = shoot;
+document.getElementById('restartBtn').onclick = startGame;
+canvas.onclick = shoot;
+
+canvas.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    let touch = e.touches[0];
+    player.x = Math.max(30, Math.min(canvas.width-30, touch.clientX));
+});
+
+function startGame() {
+    score = 0; ammo = 30; wave = 1; gameRunning = true;
+    bullets = []; enemies = [];
+    player.x = canvas.width/2;
+    document.getElementById('gameOver').style.display = 'none';
+    updateUI();
+    gameLoop();
+}
 
 function updateUI() {
     document.getElementById('score').textContent = score;
@@ -43,128 +102,110 @@ function updateUI() {
     document.getElementById('wave').textContent = wave;
 }
 
-function drawPlayer() {
-    ctx.fillStyle = '#3498db';
-    ctx.fillRect(player.x - 20, player.y - 20, 40, 40);
-    ctx.fillStyle = '#2980b9';
-    ctx.fillRect(player.x - 5, player.y - 45, 10, 30);
-}
-
 function shoot() {
-    if (ammo <= 0 ||!gameActive) return;
+    if (!gameRunning || ammo <= 0) return;
     ammo--;
-    bullets.push({ x: player.x, y: player.y - 40, r: 4, speed: 12 });
+    bullets.push({ x: player.x, y: player.y-30, speed: 12, size: 4 });
     updateUI();
-    navigator.vibrate && navigator.vibrate(50);
 }
 
 function spawnEnemy() {
     enemies.push({
-        x: Math.random() * (canvas.width - 40) + 20,
+        x: Math.random() * (canvas.width-40) + 20,
         y: -40,
-        w: 35, h: 35,
+        size: 20 + Math.random() * 15,
         speed: 1 + wave * 0.3,
-        color: `hsl(${Math.random()*360}, 70%, 50%)`
+        hp: 1
     });
 }
 
-function gameLoop(timestamp) {
-    if (!gameActive) return;
+function gameLoop() {
+    if (!gameRunning) return;
     
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Clear + gradient bg
+    ctx.fillStyle = '#001122';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
     
-    // Draw player
-    drawPlayer();
-    
-    // Spawn enemies
-    if (timestamp - lastEnemySpawn > 1500 - wave * 50) {
-        spawnEnemy();
-        lastEnemySpawn = timestamp;
+    // Stars bg
+    ctx.fillStyle = 'white';
+    for(let i=0; i<50; i++){
+        ctx.fillRect(Math.random()*canvas.width, Math.random()*canvas.height, 1, 1);
     }
     
-    // Update bullets
+    // Draw player gun
+    ctx.fillStyle = '#3498db';
+    ctx.fillRect(player.x-15, player.y-15, 30, 30);
+    ctx.fillStyle = '#2980b9';
+    ctx.fillRect(player.x-3, player.y-35, 6, 25);
+    
+    // Bullets
     bullets = bullets.filter(b => {
         b.y -= b.speed;
         ctx.fillStyle = '#f1c40f';
         ctx.beginPath();
-        ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+        ctx.arc(b.x, b.y, b.size, 0, 7);
         ctx.fill();
         return b.y > -10;
     });
     
-    // Update enemies
-    enemies = enemies.filter(e => {
-        e.y += e.speed;
-        ctx.fillStyle = e.color;
-        ctx.fillRect(e.x - e.w/2, e.y - e.h/2, e.w, e.h);
+    // Enemies
+    enemies = enemies.filter(enemy => {
+        enemy.y += enemy.speed;
         
-        // Check collision with bullets
-        for (let i = bullets.length - 1; i >= 0; i--) {
-            let b = bullets[i];
-            if (b.x > e.x - e.w/2 && b.x < e.x + e.w/2 && 
-                b.y > e.y - e.h/2 && b.y < e.y + e.h/2) {
-                bullets.splice(i, 1);
+        // Draw enemy
+        ctx.fillStyle = '#e74c3c';
+        ctx.beginPath();
+        ctx.arc(enemy.x, enemy.y, enemy.size, 0, 7);
+        ctx.fill();
+        ctx.fillStyle = '#c0392b';
+        ctx.fillRect(enemy.x-enemy.size/2, enemy.y-enemy.size/2, enemy.size, 8);
+        
+        // Enemy reached bottom
+        if (enemy.y > canvas.height) {
+            endGame();
+            return false;
+        }
+        
+        // Bullet hit check
+        bullets = bullets.filter(bullet => {
+            let dist = Math.hypot(bullet.x - enemy.x, bullet.y - enemy.y);
+            if (dist < enemy.size + bullet.size) {
                 score += 10;
+                if(score % 100 === 0) { wave++; ammo += 10; }
                 updateUI();
                 return false;
             }
-        }
+            return true;
+        });
         
-        // Enemy reached bottom
-        if (e.y > canvas.height) {
-            gameOver();
-            return false;
-        }
         return true;
     });
     
-    // Wave system
-    if (score > wave * 100) {
-        wave++;
-        ammo += 15;
+    // Spawn enemies
+    if (Math.random() < 0.02 + wave * 0.005) spawnEnemy();
+    
+    // Reload ammo
+    if (ammo === 0) {
+        ammo = 30;
         updateUI();
     }
     
     requestAnimationFrame(gameLoop);
 }
 
-function gameOver() {
-    gameActive = false;
-    ctx.fillStyle = 'rgba(0,0,0,0.7)';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 40px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('GAME OVER', canvas.width/2, canvas.height/2 - 40);
-    ctx.font = '25px Arial';
-    ctx.fillText(`Final Score: ${score}`, canvas.width/2, canvas.height/2 + 10);
-    ctx.fillText('Tap to Restart', canvas.width/2, canvas.height/2 + 60);
+function endGame() {
+    gameRunning = false;
+    document.getElementById('finalScore').textContent = score;
+    document.getElementById('gameOver').style.display = 'block';
 }
 
-function restart() {
-    if (gameActive) return;
-    score = 0; ammo = 30; wave = 1; gameActive = true;
-    bullets = []; enemies = [];
-    updateUI();
-    requestAnimationFrame(gameLoop);
-}
-
-// Controls
-document.getElementById('shootBtn').addEventListener('touchstart', shoot);
-document.getElementById('shootBtn').addEventListener('click', shoot);
-canvas.addEventListener('touchmove', (e) => {
-    player.x = e.touches[0].clientX;
+// Start
+startGame();
+window.addEventListener('resize', () => {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    player.y = canvas.height - 100;
 });
-canvas.addEventListener('mousemove', (e) => {
-    player.x = e.clientX;
-});
-canvas.addEventListener('click', () => {
-    if (!gameActive) restart();
-    else shoot();
-});
-
-updateUI();
-requestAnimationFrame(gameLoop);
 </script>
 </body>
 </html>
